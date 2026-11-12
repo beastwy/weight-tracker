@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>盐宝瘦瘦全记录</title>
+    <!-- Supabase CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./chart.umd.min.js"></script>
+    <script src="./luxon.min.js"></script>
+    <script src="./chartjs-adapter-luxon.min.js"></script>
+    <script src="./chartjs-plugin-zoom.min.js"></script>
+    <script src="./chartjs-plugin-annotation.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, sans-serif;
+        }
+        body {
+            background-color: #f5f5f7;
+            color: #222;
+            padding: 16px;
+            overflow-x: hidden;
+        }
+        .auth-wrap{
+            max-width:420px;
+            margin:40px auto;
+            background:#fff;
+            padding:24px;
+            border-radius:12px;
+            box-shadow:0 1px 6px rgba(0,0,0,0.1);
+        }
+        .auth-wrap h2{margin-bottom:16px;font-size:20px;}
+        .auth-row{margin-bottom:12px;}
+        .auth-row label{display:block;font-size:13px;margin-bottom:4px;color:#444;}
+        .auth-row input{width:100%;padding:10px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;}
+        .auth-btn-group{display:flex;gap:10px;margin-top:16px;}
+        .auth-toggle{margin-top:12px;font-size:13px;color:#2563eb;cursor:pointer;}
+        .auth-error{color:#dc2626;font-size:13px;margin:8px 0;min-height:18px;}
+        .top-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;background:#fff;padding:10px 14px;border-radius:8px;}
+        .hidden-view{display:none !important;}
+        .container {
+            display: flex;
+            gap: 20px;
+            width: 100%;
+            transition: gap 0.25s;
+        }
+        .container.collapsed { gap: 0; }
+        .left-panel {
+            width: 340px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow: hidden;
+            transition: width 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
+            opacity: 1;
+        }
+        .container.collapsed .left-panel {
+            width: 0;
+            opacity: 0;
+            margin-right: -20px;
+            pointer-events: none;
+        }
+        .right-panel {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .sidebar-handle {
+            position: fixed;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 64px;
+            background: #2563eb;
+            color: #fff;
+            border: none;
+            border-radius: 0 8px 8px 0;
+            cursor: pointer;
+            box-shadow: 2px 0 6px rgba(0,0,0,0.15);
+            transition: width 0.15s, background 0.15s;
+            font-size: 14px;
+            font-weight: bold;
+            padding: 0;
+        }
+        .sidebar-handle:hover { width: 28px; background: #1d4ed8; }
+        .sidebar-handle .arrow { transition: transform 0.25s; display: inline-block; }
+        .container.collapsed .sidebar-handle .arrow { transform: rotate(180deg); }
+        .accordion {
+            background: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            flex-shrink: 0;
+        }
+        .accordion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 600;
+            color: #222;
+            user-select: none;
+            background: #ffffff;
+            transition: background 0.15s;
+        }
+        .accordion-header:hover { background: #f0f0f5; }
+        .accordion-header .arrow {
+            font-size: 12px;
+            color: #888;
+            transition: transform 0.2s;
+        }
+        .accordion.open .accordion-header .arrow { transform: rotate(90deg); }
+        .accordion-body {
+            display: none;
+            padding: 0 16px 16px 16px;
+            border-top: 1px solid #eee;
+        }
+        .accordion.open .accordion-body { display: block; }
+        .form-row { margin-bottom: 10px; }
+        .form-two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .form-inline-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        label {
+            display: block;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #555;
+        }
+        .inline-label { margin-bottom: 0; }
+        .date-input-wrap { position: relative; }
+        input.text-date {
+            width: 100%;
+            padding: 8px 10px;
+            background: #fafafa;
+            border: 1px solid #d0d0d8;
+            color: #222;
+            border-radius: 6px;
+        }
+        input.hidden-native-date {
+            position: absolute;
+            width: 1px; height: 1px;
+            opacity: 0;
+            pointer-events: none;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px 10px;
+            background: #fafafa;
+            border: 1px solid #d0d0d8;
+            color: #222;
+            border-radius: 6px;
+        }
+        .checkbox-wrap-inline {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        button {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .btn-primary { background: #2563eb; color: white; }
+        .btn-secondary { background: #e5e5ea; color: #333; }
+        .btn-danger {
+            background: #dc2626;
+            color: white;
+            padding: 4px 7px;
+            font-size: 11px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        .scroll-list {
+            max-height: 180px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .item-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 7px 8px;
+            background: #f2f2f7;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .table-outer { max-height: 300px; overflow: auto; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        table th, table td {
+            border: 1px solid #e0e0e0;
+            padding: 6px;
+            text-align: center;
+            white-space: nowrap;
+        }
+        table th {
+            background: #f2f2f7;
+            position: sticky;
+            top: 0;
+            z-index: 2;
+        }
+        .card {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            width: 100%;
+        }
+        .card h3 {
+            margin-bottom: 12px;
+            font-size: 16px;
+            color: #222;
+            border-bottom: 1px solid #e5e5e5;
+            padding-bottom: 8px;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 10px;
+        }
+        .dash-item {
+            background: #fafafa;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #eee;
+        }
+        .dash-item .lbl {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+        .dash-item .val {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2563eb;
+        }
+        .series-toggle-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            padding: 10px 12px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            font-size: 13px;
+            align-items: center;
+            width: 100%;
+        }
+        .series-toggle-bar label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 0;
+            cursor: pointer;
+            color: #333;
+        }
+        .series-toggle-bar input[type="checkbox"] {
+            width: 16px; height: 16px;
+            cursor: pointer;
+        }
+        .series-toggle-bar .bar-title {
+            font-weight: 600;
+            color: #555;
+            margin-right: 4px;
+        }
+        .chart-wrap {
+            position: relative;
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            width: 100%;
+        }
+        #chartCanvas {
+            width: 100% !important;
+            height: 560px !important;
+            display: block;
+            cursor: grab;
+            touch-action: none;
+        }
+        #chartCanvas.dragging { cursor: grabbing; }
+        .chart-btn-bar {
+            text-align: center;
+            margin-top: 12px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        .hidden-input { display: none; }
+        .chart-error {
+            color: #dc2626;
+            text-align: center;
+            padding: 40px 10px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .ai-chat-box {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 420px;
+            overflow-y: auto;
+            padding: 10px;
+            background: #fafafa;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+        .ai-msg {
+            padding: 8px 10px;
+            border-radius: 8px;
+            max-width: 100%;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .ai-msg.user {
+            background: #dbeafe;
+            color: #1e3a8a;
+            align-self: flex-end;
+            margin-left: 30px;
+        }
+        .ai-msg.assistant {
+            background: #ffffff;
+            color: #222;
+            align-self: flex-start;
+            margin-right: 30px;
+            border: 1px solid #eee;
+        }
+        .ai-msg.system {
+            background: #fef3c7;
+            color: #92400e;
+            align-self: center;
+            font-size: 12px;
+            text-align: center;
+        }
+        .ai-input-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .ai-input-row input {
+            flex: 1;
+            padding: 8px 10px;
+            background: #fff;
+            border: 1px solid #d0d0d8;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .ai-status {
+            font-size: 12px;
+            color: #888;
+            margin-top: 6px;
+            min-height: 16px;
+        }
+        .ai-status.loading { color: #2563eb; }
+        .ai-status.error { color: #dc2626; }
+        @media (max-width: 900px) {
+            .container { flex-direction: column; }
+            .left-panel { width: 100%; }
+            .container.collapsed .left-panel {
+                width: 100%;
+                opacity: 1;
+                margin-right: 0;
+                pointer-events: auto;
+            }
+            .dashboard { grid-template-columns: repeat(3, 1fr); }
+            .sidebar-handle { display: none; }
+        }
+    </style>
+</head>
+<body>
+<!-- 登录注册视图 -->
+<div id="authView" class="auth-wrap">
+    <h2>盐宝瘦瘦全记录｜登录/注册</h2>
+    <div class="auth-error" id="authErr"></div>
+    <div class="auth-row">
+        <label>邮箱</label>
+        <input id="authEmail" type="email" placeholder="输入邮箱">
+    </div>
+    <div class="auth-row">
+        <label>密码（不少于6位）</label>
+        <input id="authPwd" type="password" placeholder="输入密码">
+    </div>
+    <div class="auth-btn-group">
+        <button class="btn-primary" id="btnSignIn">登录</button>
+        <button class="btn-secondary" id="btnSignUp">注册账号</button>
+    </div>
+    <div class="auth-toggle" id="authTip">注册新账号，填写邮箱密码点注册</div>
+</div>
+
+<!-- 主业务视图（登录成功后显示） -->
+<div id="mainAppView" class="hidden-view">
+    <div class="top-bar">
+        <div>盐宝瘦瘦全记录</div>
+        <div>
+            <span id="userEmailShow"></span>
+            <button class="btn-danger" id="btnSignOut">退出登录</button>
+        </div>
+    </div>
+<button class="sidebar-handle" id="sidebarHandle" title="展开/收起侧边栏">
+    <span class="arrow">❮</span>
+</button>
+<div class="container" id="mainContainer">
+    <div class="left-panel" id="leftPanel">
+        <div class="accordion" id="accAddRecord">
+            <div class="accordion-header" onclick="toggleAccordion('accAddRecord')">
+                <span>➕ 新增体重记录</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-body">
+                <div class="form-row">
+                    <label>日期</label>
+                    <div class="date-input-wrap">
+                        <input class="text-date" id="recDateText" placeholder="yyyy/mm/dd">
+                        <input type="date" class="hidden-native-date" id="recDateNative">
+                    </div>
+                </div>
+                <div class="form-row form-two-col">
+                    <div>
+                        <label>早晨体重(kg)</label>
+                        <input type="number" step="0.05" id="recMorning">
+                    </div>
+                    <div>
+                        <label>晚上体重(kg)</label>
+                        <input type="number" step="0.05" id="recEvening">
+                    </div>
+                </div>
+                <div class="form-row form-inline-row">
+                    <label class="inline-label">是否喝中药膏方</label>
+                    <div class="checkbox-wrap-inline">
+                        <input style="width:18px;height:18px;" type="checkbox" id="recHerb">
+                    </div>
+                </div>
+                <div class="form-row form-two-col">
+                    <div class="form-inline-row">
+                        <label class="inline-label">是否打针</label>
+                        <div class="checkbox-wrap-inline">
+                            <input style="width:18px;height:18px;" type="checkbox" id="recSema">
+                        </div>
+                    </div>
+                    <div>
+                        <label>剂量</label>
+                        <input type="number" step="0.01" id="recDose">
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-primary" id="btnAddRecord">新增记录</button>
+                    <button class="btn-secondary" id="btnClearForm">清空表单</button>
+                </div>
+            </div>
+        </div>
+        <div class="accordion" id="accPeriod">
+            <div class="accordion-header" onclick="toggleAccordion('accPeriod')">
+                <span>🩷 经期区间管理</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-body">
+                <div class="form-row form-two-col">
+                    <div>
+                        <label>经期开始</label>
+                        <div class="date-input-wrap">
+                            <input class="text-date" id="periodStartText" placeholder="yyyy/mm/dd">
+                            <input type="date" class="hidden-native-date" id="periodStartNative">
+                        </div>
+                    </div>
+                    <div>
+                        <label>经期结束</label>
+                        <div class="date-input-wrap">
+                            <input class="text-date" id="periodEndText" placeholder="yyyy/mm/dd">
+                            <input type="date" class="hidden-native-date" id="periodEndNative">
+                        </div>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn-primary" id="btnAddPeriod">新增经期区间</button>
+                </div>
+                <div class="scroll-list" id="periodListBox"></div>
+            </div>
+        </div>
+        <div class="accordion" id="accDataTable">
+            <div class="accordion-header" onclick="toggleAccordion('accDataTable')">
+                <span>📋 全部每日数据</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-body">
+                <div class="btn-group">
+                    <button class="btn-danger" id="btnClearAllRecords">清空全部数据</button>
+                </div>
+                <div class="table-outer">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>日期</th>
+                                <th>早体重</th>
+                                <th>晚体重</th>
+                                <th>膏方</th>
+                                <th>打针</th>
+                                <th>剂量</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="accordion" id="accCsv">
+            <div class="accordion-header" onclick="toggleAccordion('accCsv')">
+                <span>📁 CSV 导入导出</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-body">
+                <div class="btn-group">
+                    <button class="btn-secondary" id="btnExportCsv">导出CSV</button>
+                    <button class="btn-secondary" id="btnImportCsv">导入CSV</button>
+                </div>
+                <input type="file" accept=".csv" id="fileInput" class="hidden-input">
+                <div style="margin-top:8px;font-size:12px;color:#888">兼容格式：date,morning_weight,evening_weight,herb,semaglutide,dose</div>
+            </div>
+        </div>
+        <div class="accordion" id="accAI">
+            <div class="accordion-header" onclick="toggleAccordion('accAI')">
+                <span>🤖 AI 分析【网页版暂不可用，本地exe可用】</span>
+                <span class="arrow">▶</span>
+            </div>
+            <div class="accordion-body">
+                <div style="color:#888;font-size:12px;margin-bottom:8px;">网页公网无法访问本地localhost接口；exe本地版本可正常开启AI功能</div>
+                <div class="btn-group">
+                    <button class="btn-primary" id="btnAIAnalyze" disabled>一键分析我的数据</button>
+                    <button class="btn-secondary" id="btnAIClear" disabled>清空对话</button>
+                </div>
+                <div class="ai-status" id="aiStatus"></div>
+                <div class="ai-chat-box" id="aiChatBox">
+                    <div class="ai-msg system">网页版本AI功能禁用。</div>
+                </div>
+                <div class="ai-input-row">
+                    <input type="text" id="aiUserInput" placeholder="网页版AI已关闭" disabled>
+                    <button class="btn-primary" id="btnAISend" disabled>发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="right-panel">
+        <div class="card">
+            <h3>📊 数据看板</h3>
+            <div class="dashboard">
+                <div class="dash-item">
+                    <div class="lbl">最早体重记录</div>
+                    <div class="val" id="dashFirst">--</div>
+                </div>
+                <div class="dash-item">
+                    <div class="lbl">最新早晨体重</div>
+                    <div class="val" id="dashLatestMorning">--</div>
+                </div>
+                <div class="dash-item">
+                    <div class="lbl">最低早晨体重</div>
+                    <div class="val" id="dashMinMorning">--</div>
+                </div>
+                <div class="dash-item">
+                    <div class="lbl">总减重(kg)</div>
+                    <div class="val" id="dashLost">--</div>
+                </div>
+                <div class="dash-item">
+                    <div class="lbl">总记录条数</div>
+                    <div class="val" id="dashTotalRows">0</div>
+                </div>
+                <div class="dash-item">
+                    <div class="lbl">累计打针剂量</div>
+                    <div class="val" id="dashTotalDose">0</div>
+                </div>
+            </div>
+        </div>
+        <div class="series-toggle-bar">
+            <span class="bar-title">图表显示：</span>
+            <label><input type="checkbox" id="chkMorningLine" checked> 早晨原始连线</label>
+            <label><input type="checkbox" id="chkSmoothLine" checked> 早晨平滑趋势</label>
+            <label><input type="checkbox" id="chkMorningDot" checked> 早晨体重（蓝点）</label>
+            <label><input type="checkbox" id="chkEveningDot" checked> 晚上体重（橙点）</label>
+            <label><input type="checkbox" id="chkHerbDot" checked> 中药膏方（绿三角）</label>
+            <label><input type="checkbox" id="chkPeriodBox" checked> 经期区间</label>
+            <label><input type="checkbox" id="chkShotLabel" checked> 打针剂量标注</label>
+        </div>
+        <div class="chart-wrap">
+            <canvas id="chartCanvas"></canvas>
+            <div id="chartError" class="chart-error" style="display:none;"></div>
+            <div class="chart-btn-bar">
+                <button class="btn-primary" id="btnSaveImage">保存图片</button>
+                <button class="btn-secondary" id="btnResetZoom">重置缩放</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+// ======================【修改这里填入你的Supabase配置】======================
+const SUPABASE_URL = "https://yvbnhkbvflqmbadyyjgn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl2Ym5oa2J2ZmxxbWJhZHl5amduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ0NjgxNTAsImV4cCI6MjExMDA0NDE1MH0.pF_3anGFS81qm_i_4HM35auW1HRNVip8XSKFRNV_Fcw";
+// =========================================================================
+
+const { createClient } = supabase;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// 全局状态
+let currentUser = null;
+let records = [];
+let periods = [];
+let chart = null;
+let realtimeChannel = null;
+
+// 本地存储只保留界面布局设置，不再存业务数据
+const STORAGE_SIDEBAR = "weight_sidebar_collapsed";
+const STORAGE_SERIES = "weight_series_visible";
+const defaultSeriesVisible = {
+    morningLine: true,
+    smoothLine: true,
+    morningDot: true,
+    eveningDot: true,
+    herbDot: true,
+    periodBox: true,
+    shotLabel: true
+};
+
+// ========= 登录鉴权相关函数 =========
+const authView = document.getElementById("authView");
+const mainAppView = document.getElementById("mainAppView");
+const authErrEl = document.getElementById("authErr");
+const userEmailShow = document.getElementById("userEmailShow");
+
+function showAuthError(msg){ authErrEl.innerText = msg; }
+function clearAuthError(){ authErrEl.innerText = ""; }
+
+// 检查当前登录状态
+async function checkSession(){
+    const {data:{session}} = await supabase.auth.getSession();
+    if(session){
+        currentUser = session.user;
+        showMainApp();
+        startRealtimeSync();
+        await loadCloudData();
+    }else{
+        showAuthView();
+    }
+}
+
+function showAuthView(){
+    authView.classList.remove("hidden-view");
+    mainAppView.classList.add("hidden-view");
+}
+function showMainApp(){
+    authView.classList.add("hidden-view");
+    mainAppView.classList.remove("hidden-view");
+    userEmailShow.innerText = currentUser?.email || "";
+}
+
+// 登录注册事件
+document.getElementById("btnSignIn").onclick = async ()=>{
+    clearAuthError();
+    const email = document.getElementById("authEmail").value.trim();
+    const pwd = document.getElementById("authPwd").value;
+    const {data,error} = await supabase.auth.signInWithPassword({email,password:pwd});
+    if(error){ showAuthError(error.message); return; }
+    currentUser = data.session.user;
+    showMainApp();
+    startRealtimeSync();
+    await loadCloudData();
+};
+
+document.getElementById("btnSignUp").onclick = async ()=>{
+    clearAuthError();
+    const email = document.getElementById("authEmail").value.trim();
+    const pwd = document.getElementById("authPwd").value;
+    const {data,error} = await supabase.auth.signUp({email,password:pwd});
+    if(error){ showAuthError(error.message); return; }
+    alert("账号注册成功，请直接登录");
+};
+
+document.getElementById("btnSignOut").onclick = async ()=>{
+    if(realtimeChannel) realtimeChannel.unsubscribe();
+    await supabase.auth.signOut();
+    currentUser = null;
+    records = [];
+    periods = [];
+    showAuthView();
+};
+
+// ========== Supabase云端读写函数 =========
+// 从云端拉取当前用户全部数据
+async function loadCloudData(){
+    if(!currentUser) return;
+    const {data:recData,err:recErr} = await supabase.from("weight_records").select("*").eq("user_id",currentUser.id);
+    const {data:perData,err:perErr} = await supabase.from("weight_periods").select("*").eq("user_id",currentUser.id);
+    if(recErr||perErr){ alert("读取云端数据失败："+(recErr?.message||perErr?.message)); return; }
+    records = recData.map(r=>({
+        date:r.date,
+        morning_weight: r.morning_weight,
+        evening_weight: r.evening_weight,
+        herb: r.herb,
+        semaglutide: r.semaglutide,
+        dose: r.dose
+    }));
+    periods = perData.map(p=>([p.period_start,p.period_end]));
+    renderAll();
+}
+
+// 新增/覆盖单条体重记录云端
+async function upsertRecordCloud(newRow){
+    await supabase.from("weight_records").delete().eq("user_id",currentUser.id).eq("date",newRow.date);
+    await supabase.from("weight_records").insert([{
+        user_id:currentUser.id,
+        date: newRow.date,
+        morning_weight: newRow.morning_weight,
+        evening_weight: newRow.evening_weight,
+        herb: newRow.herb,
+        semaglutide: newRow.semaglutide,
+        dose: newRow.dose
+    }]);
+}
+
+// 删除指定日期记录云端
+async function deleteRecordByDateCloud(dateStr){
+    await supabase.from("weight_records").delete().eq("user_id",currentUser.id).eq("date",dateStr);
+}
+
+// 添加经期云端
+async function insertPeriodCloud(start,end){
+    await supabase.from("weight_periods").insert([{user_id:currentUser.id,period_start:start,period_end:end}]);
+}
+
+// 删除经期云端
+async function deletePeriodCloud(start,end){
+    await supabase.from("weight_periods").delete().eq("user_id",currentUser.id).eq("period_start",start).eq("period_end",end);
+}
+
+// 清空全部我的体重记录云端
+async function clearAllMyRecordsCloud(){
+    await supabase.from("weight_records").delete().eq("user_id",currentUser.id);
+}
+
+// Realtime多设备实时监听，数据变更自动刷新页面
+function startRealtimeSync(){
+    if(!currentUser) return;
+    if(realtimeChannel) realtimeChannel.unsubscribe();
+    realtimeChannel = supabase.channel(`user_${currentUser.id}`)
+    .on('postgres_changes',{event:'*',schema:'public',table:'weight_records',filter:`user_id=eq.${currentUser.id}`},async ()=>{
+        await loadCloudData();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'weight_periods',filter:`user_id=eq.${currentUser.id}`},async ()=>{
+        await loadCloudData();
+    }).subscribe();
+}
+
+// ========== 工具函数（原样保留） =========
+function dashToSlash(s){ return s.replace(/-/g,"/"); }
+function normalizeDateStr(s){ return s.trim().replace(/\//g,"-"); }
+function isValidDateString(inputStr){
+    const normalized = normalizeDateStr(inputStr);
+    const d = new Date(normalized);
+    return !isNaN(d.getTime()) && normalized === d.toISOString().slice(0,10);
+}
+function bindDatePair(textId,nativeId){
+    const textEl = document.getElementById(textId);
+    const nativeEl = document.getElementById(nativeId);
+    textEl.addEventListener("click",()=>{ try{nativeEl.showPicker();}catch(e){} });
+    nativeEl.addEventListener("change",()=>{
+        if(nativeEl.value){ textEl.value = dashToSlash(nativeEl.value); }
+    });
+}
+
+function parseCsv(text){
+    const lines = text.trim().split("\n");
+    if(lines.length <= 1) return [];
+    const header = lines[0].split(",");
+    const arr = [];
+    for(let i=1;i<lines.length;i++){
+        const cols = lines[i].split(",");
+        const row = {};
+        for(let h=0;h<header.length;h++){
+            let v = cols[h]??"";
+            const key = header[h].trim();
+            if(key==="herb" || key==="semaglutide"){
+                row[key] = (v.trim().toLowerCase()==="true");
+            }else if(key==="morning_weight" || key==="evening_weight" || key==="dose"){
+                row[key] = v.trim()==="" ? null : Number(v);
+            }else{
+                row[key] = v.trim();
+            }
+        }
+        arr.push(row);
+    }
+    return arr;
+}
+
+function getFullExportText(recList, perList){
+    const header = ["date","morning_weight","evening_weight","herb","semaglutide","dose"];
+    const rows = [header.join(",")];
+    for(let r of recList){
+        rows.push([
+            r.date||"",
+            r.morning_weight??"",
+            r.evening_weight??"",
+            Boolean(r.herb).toString(),
+            Boolean(r.semaglutide).toString(),
+            r.dose??""
+        ].join(","));
+    }
+    rows.push("###PERIODS###");
+    rows.push("period_start,period_end");
+    for(let p of perList){
+        rows.push(p.join(","));
+    }
+    return rows.join("\n");
+}
+
+function parseFullCsv(text){
+    const lines = text.trim().split("\n");
+    const splitIndex = lines.findIndex(line=> line.trim() === "###PERIODS###");
+    let recordLines, periodLines;
+    if(splitIndex >=0){
+        recordLines = lines.slice(0, splitIndex);
+        periodLines = lines.slice(splitIndex+1);
+    }else{
+        recordLines = lines;
+        periodLines = [];
+    }
+    const outRecords = [];
+    if(recordLines.length>1){
+        const headerRec = recordLines[0].split(",");
+        for(let i=1;i<recordLines.length;i++){
+            const cols = recordLines[i].split(",");
+            const row = {};
+            for(let h=0;h<headerRec.length;h++){
+                let v = cols[h]??"";
+                const key = headerRec[h].trim();
+                if(key==="herb" || key==="semaglutide"){
+                    row[key] = (v.trim().toLowerCase()==="true");
+                }else if(key==="morning_weight" || key==="evening_weight" || key==="dose"){
+                    row[key] = v.trim()==="" ? null : Number(v);
+                }else{
+                    row[key] = v.trim();
+                }
+            }
+            outRecords.push(row);
+        }
+    }
+    const outPeriods = [];
+    if(periodLines.length>0){
+        for(let i=1;i<periodLines.length;i++){
+            const line = periodLines[i].trim();
+            if(!line) continue;
+            const cols = line.split(",");
+            const s = cols[0]?.trim();
+            const e = cols[1]?.trim();
+            if(s && e){
+                outPeriods.push([s,e]);
+            }
+        }
+    }
+    return {records:outRecords, periods:outPeriods};
+}
+
+function downloadFile(text, filename){
+    const blob = new Blob([text],{type:"text/csv;charset=utf-8"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+}
+
+function rollingCenterAvg(arr, window=5){
+    const out = [];
+    const n = arr.length;
+    for(let i=0;i<n;i++){
+        let cnt=0, sum=0;
+        const half = Math.floor(window/2);
+        let start = Math.max(0, i-half);
+        let end = Math.min(n-1, i+half);
+        for(let j=start;j<=end;j++){
+            if(arr[j]!==null && !isNaN(arr[j])){ sum+=arr[j]; cnt++; }
+        }
+        if(cnt>0){
+            out.push(sum/cnt);
+        }else{
+            let fallback = null;
+            for(let k = i-1; k>=0; k--){
+                if(arr[k]!==null && !isNaN(arr[k])){
+                    fallback = arr[k];
+                    break;
+                }
+            }
+            out.push(fallback);
+        }
+    }
+    return out;
+}
+
+// 系列显示配置（保留localStorage仅界面）
+function getSeriesVisible(){
+    let raw = localStorage.getItem(STORAGE_SERIES);
+    if(!raw) return {...defaultSeriesVisible};
+    try { return Object.assign({}, defaultSeriesVisible, JSON.parse(raw)); }
+    catch(e){ return {...defaultSeriesVisible}; }
+}
+function saveSeriesVisible(obj){
+    localStorage.setItem(STORAGE_SERIES, JSON.stringify(obj));
+}
+let seriesVisible = getSeriesVisible();
+
+// ========= 界面渲染逻辑 =========
+function sortRecords(arr){
+    return arr.slice().sort((a,b)=> new Date(a.date).getTime() - new Date(b.date).getTime());
+}
+function sortRecordsDesc(arr){
+    return arr.slice().sort((a,b)=> new Date(b.date).getTime() - new Date(a.date).getTime());
+}
+function isEmptyRecord(r){
+    const hasWeight = r.morning_weight!==null || r.evening_weight!==null;
+    const hasHerb = !!r.herb;
+    const hasShot = !!r.semaglutide || r.dose!==null;
+    return !hasWeight && !hasHerb && !hasShot;
+}
+
+function renderAll(){
+    renderPeriodList();
+    renderDataTable();
+    renderDashboard();
+    renderChart();
+}
+
+function renderPeriodList(){
+    const box = document.getElementById("periodListBox");
+    box.innerHTML = "";
+    const sortedPeriods = [...periods].sort((a,b)=> new Date(b[0]).getTime() - new Date(a[0]).getTime());
+    sortedPeriods.forEach((p)=>{
+        const div = document.createElement("div");
+        div.className = "item-row";
+        div.innerHTML = `<span>${p[0]} ~ ${p[1]}</span>
+        <button class="btn-danger del-per">删除</button>`;
+        box.appendChild(div);
+        div.querySelector(".del-per").onclick = async ()=>{
+            await deletePeriodCloud(p[0],p[1]);
+        };
+    });
+}
+
+function renderDataTable(){
+    const tbody = document.getElementById("tableBody");
+    tbody.innerHTML = "";
+    const sortedDesc = sortRecordsDesc(records);
+    const filterList = sortedDesc.filter(r=> !isEmptyRecord(r));
+    filterList.forEach((r)=>{
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${r.date||""}</td>
+            <td>${r.morning_weight??""}</td>
+            <td>${r.evening_weight??""}</td>
+            <td>${r.herb?"是":"否"}</td>
+            <td>${r.semaglutide?"是":"否"}</td>
+            <td>${r.dose??""}</td>
+            <td><button class="btn-danger del-row" data-date="${r.date}">删除</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+    tbody.querySelectorAll(".del-row").forEach(btn=>{
+        btn.onclick = async ()=>{
+            const delDate = btn.dataset.date;
+            await deleteRecordByDateCloud(delDate);
+        };
+    });
+}
+
+function renderDashboard(){
+    const sorted = sortRecords(records);
+    let firstWeightRec = null;
+    for(const r of sorted){
+        if(r.morning_weight!==null || r.evening_weight!==null){
+            firstWeightRec = r;
+            break;
+        }
+    }
+    const morningList = sorted.filter(r=>r.morning_weight!==null).map(r=>({date:r.date, val:r.morning_weight}));
+    let latestMorning=null, minMorning=null, totalLost=null, totalDose=0;
+    sorted.forEach(r=>{ if(r.semaglutide && r.dose!==null) totalDose += Number(r.dose); });
+    if(morningList.length>0){
+        latestMorning = morningList[morningList.length-1];
+        minMorning = morningList.reduce((a,b)=> a.val < b.val ? a : b);
+    }
+    if(firstWeightRec && latestMorning){
+        const firstVal = firstWeightRec.morning_weight ?? firstWeightRec.evening_weight;
+        totalLost = Number(firstVal) - Number(latestMorning.val);
+    }
+    let firstShowText = "--";
+    if(firstWeightRec){
+        const v = firstWeightRec.morning_weight ?? firstWeightRec.evening_weight;
+        firstShowText = `${v} kg (${firstWeightRec.date})`;
+    }
+    document.getElementById("dashFirst").innerText = firstShowText;
+    document.getElementById("dashLatestMorning").innerText = latestMorning ? `${latestMorning.val} kg (${latestMorning.date})` : "--";
+    document.getElementById("dashMinMorning").innerText = minMorning ? `${minMorning.val} kg (${minMorning.date})` : "--";
+    document.getElementById("dashLost").innerText = totalLost !== null ? totalLost.toFixed(2)+" kg" : "--";
+    document.getElementById("dashTotalRows").innerText = sorted.length;
+    document.getElementById("dashTotalDose").innerText = totalDose.toFixed(2);
+}
+
+function getNearestWeightForShotLabel(sorted, idx) {
+    for(let i = idx; i >= 0; i--) {
+        const r = sorted[i];
+        const w = r.morning_weight ?? r.evening_weight;
+        if(w !== null) return Number(w);
+    }
+    for(let i = idx + 1; i < sorted.length; i++) {
+        const r = sorted[i];
+        const w = r.morning_weight ?? r.evening_weight;
+        if(w !== null) return Number(w);
+    }
+    return null;
+}
+function getFirstWeightRecord(sorted) {
+    for(const r of sorted) {
+        if(r.morning_weight !== null || r.evening_weight !== null) {
+            return r;
+        }
+    }
+    return null;
+}
+
+function renderChart(){
+    const canvas = document.getElementById("chartCanvas");
+    const errBox = document.getElementById("chartError");
+    if (typeof Chart === "undefined") {
+        canvas.style.display = "none";
+        errBox.style.display = "block";
+        errBox.innerHTML = "⚠️ 图表库加载失败，趋势图无法显示。<br>请确认本地 JS 文件与 HTML 在同一文件夹，且文件名一致。";
+        console.warn("Chart.js 未加载，跳过图表渲染。");
+        return;
+    }
+    canvas.style.display = "";
+    errBox.style.display = "none";
+    const ctx = canvas.getContext("2d");
+    if(chart) chart.destroy();
+    const sorted = sortRecords(records);
+    let chartTitleText = "体重追踪";
+    const firstWeightRec = getFirstWeightRecord(sorted);
+    const lastRec = sorted.length > 0 ? sorted[sorted.length - 1] : null;
+    if(firstWeightRec && lastRec){
+        const dStart = new Date(firstWeightRec.date);
+        const dEnd = new Date(lastRec.date);
+        const y1 = dStart.getFullYear();
+        const m1 = dStart.getMonth()+1;
+        const y2 = dEnd.getFullYear();
+        const m2 = dEnd.getMonth()+1;
+        chartTitleText = `体重追踪（${y1}年${m1}月‑${y2}年${m2}月）`;
+    }
+    const morningPoints = sorted.filter(r=>r.morning_weight!==null).map(r=>({x:r.date, y:r.morning_weight}));
+    const morningAllVals = sorted.map(r=>r.morning_weight??null);
+    const smoothVals = rollingCenterAvg(morningAllVals,5);
+    const smoothPoints = sorted.map((r,i)=>({x:r.date, y:smoothVals[i]}));
+    const eveningPoints = sorted.filter(r=>r.evening_weight!==null).map(r=>({x:r.date, y:r.evening_weight}));
+    const herbPoints = sorted.filter(r=>r.herb===true).map(r=>{
+        const y = r.morning_weight ?? r.evening_weight;
+        return {x:r.date, y:y};
+    }).filter(p=>p.y!==null);
+    const annObj = {};
+    if(seriesVisible.periodBox){
+        periods.forEach((p,i)=>{
+            annObj["period_"+i] = {
+                type:"box",
+                xMin:p[0], xMax:p[1],
+                backgroundColor:"rgba(255,182,193,0.35)",
+                borderWidth:0
+            };
+        });
+    }
+    if(seriesVisible.shotLabel){
+        sorted.forEach((r,i)=>{
+            if(!r.semaglutide) return;
+            let shotY = r.morning_weight ?? r.evening_weight;
+            if(shotY === null){
+                shotY = getNearestWeightForShotLabel(sorted, i);
+            }
+            if(shotY === null) return;
+            annObj["shot_"+i] = {
+                type:"label",
+                xValue:r.date,
+                yValue: Number(shotY),
+                content:[String(r.dose)],
+                font:{size:12,weight:"bold"},
+                color:"#b8860b",
+                backgroundColor:"rgba(255,255,255,0.75)",
+                padding:2,
+                yAdjust:-18
+            };
+        });
+    }
+    const plugins = {};
+    plugins.annotation = { annotations: annObj };
+    if (Chart.registry && Chart.registry.plugins && Chart.registry.plugins.get("zoom")) {
+        plugins.zoom = {
+            pan: { enabled: false },
+            zoom: {
+                wheel: { enabled: true, speed: 0.08 },
+                pinch: { enabled: true },
+                mode: "xy"
+            }
+        };
+    }
+    const datasets = [];
+    if(seriesVisible.morningLine){
+        datasets.push({
+            label:"早晨原始连线",
+            type:"line",
+            data:morningPoints,
+            borderColor:"#a0c8e8",
+            backgroundColor:"transparent",
+            borderWidth:1.4,
+            pointRadius:0,
+            tension:0
+        });
+    }
+    if(seriesVisible.smoothLine){
+        datasets.push({
+            label:"早晨体重平滑趋势",
+            type:"line",
+            data:smoothPoints,
+            borderColor:"#1f77b4",
+            backgroundColor:"transparent",
+            borderWidth:2,
+            pointRadius:0,
+            tension:0.2
+        });
+    }
+    if(seriesVisible.morningDot){
+        datasets.push({
+            label:"早晨体重（蓝点）",
+            type:"scatter",
+            data:morningPoints,
+            backgroundColor:"#1f77b4",
+            pointRadius:4
+        });
+    }
+    if(seriesVisible.eveningDot){
+        datasets.push({
+            label:"晚上体重（橙点）",
+            type:"scatter",
+            data:eveningPoints,
+            backgroundColor:"#ff7f0e",
+            pointRadius:4
+        });
+    }
+    if(seriesVisible.herbDot){
+        datasets.push({
+            label:"中药膏方（绿三角）",
+            type:"scatter",
+            data:herbPoints,
+            backgroundColor:"#2ca02c",
+            pointStyle:"triangle",
+            pointRadius:7
+        });
+    }
+    chart = new Chart(ctx, {
+        type:"line",
+        data:{ datasets },
+        options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins: Object.assign({
+                legend:{
+                    position:"right",
+                    labels:{ color:"#333", font:{size:11}, boxWidth:14 }
+                },
+                title:{
+                    display:true,
+                    text: chartTitleText,
+                    color:"#222",
+                    font:{size:16,weight:"bold"}
+                },
+                tooltip:{
+                    mode:"index",
+                    callbacks:{
+                        title:function(items){
+                            if(items.length>0) return "日期：" + items[0].label;
+                            return "";
+                        },
+                        label:function(item){
+                            return item.dataset.label + "：" + item.formattedValue + " kg";
+                        }
+                    }
+                }
+            }, plugins),
+            scales:{
+                x:{
+                    type:"time",
+                    adapters:{date:{zone:"utc"}},
+                    time:{unit:"day",displayFormats:{day:"yyyy‑MM‑dd"}},
+                    ticks:{color:"#333",maxRotation:45},
+                    grid:{color:"rgba(0,0,0,0.08)"},
+                    title:{display:true,text:"日期",color:"#333",font:{size:13}}
+                },
+                y:{
+                    beginAtZero:false,
+                    title:{display:true,text:"体重 (kg)",color:"#333",font:{size:13}},
+                    ticks:{color:"#333"},
+                    grid:{color:"rgba(0,0,0,0.08)"}
+                }
+            },
+            backgroundColor:"#ffffff"
+        }
+    });
+    attachPanHandlers(canvas);
+}
+
+function attachPanHandlers(canvas){
+    canvas._panAttached = false;
+    let isDragging = false;
+    let dragStartX = 0, dragStartY = 0;
+    let xMinStart, xMaxStart, yMinStart, yMaxStart;
+    function onMouseDown(e){
+        if (e.button !== 0) return;
+        if (e.shiftKey) return;
+        if (!chart) return;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        if (!xScale || !yScale) return;
+        isDragging = true;
+        canvas.classList.add("dragging");
+        dragStartX = e.clientX;
+        dragStartY = e.clientY;
+        xMinStart = xScale.min;
+        xMaxStart = xScale.max;
+        yMinStart = yScale.min;
+        yMaxStart = yScale.max;
+        e.preventDefault();
+    }
+    function onMouseMove(e){
+        if (!isDragging || !chart) return;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        if (!xScale || !yScale) return;
+        const rect = canvas.getBoundingClientRect();
+        const dxPixels = e.clientX - dragStartX;
+        const dyPixels = e.clientY - dragStartY;
+        const xRange = xMaxStart - xMinStart;
+        const yRange = yMaxStart - yMinStart;
+        const xDelta = (dxPixels / rect.width)  * xRange;
+        const yDelta = (dyPixels / rect.height) * yRange;
+        xScale.options.min = xMinStart - xDelta;
+        xScale.options.max = xMaxStart - xDelta;
+        yScale.options.min = yMinStart + yDelta;
+        yScale.options.max = yMaxStart + yDelta;
+        chart.update("none");
+        e.preventDefault();
+    }
+    function onMouseUp(){
+        if (isDragging){
+            isDragging = false;
+            canvas.classList.remove("dragging");
+        }
+    }
+    function onMouseLeave(){
+        if (isDragging){
+            isDragging = false;
+            canvas.classList.remove("dragging");
+        }
+    }
+    let touchLastX = 0, touchLastY = 0, touchActive = false;
+    function onTouchStart(e){
+        if (e.touches.length !== 1 || !chart) return;
+        touchActive = true;
+        touchLastX = e.touches[0].clientX;
+        touchLastY = e.touches[0].clientY;
+    }
+    function onTouchMove(e){
+        if (!touchActive || !chart || e.touches.length !== 1) return;
+        const xScale = chart.scales.x;
+        const yScale = chart.scales.y;
+        if (!xScale || !yScale) return;
+        const rect = canvas.getBoundingClientRect();
+        const dx = e.touches[0].clientX - touchLastX;
+        const dy = e.touches[0].clientY - touchLastY;
+        touchLastX = e.touches[0].clientX;
+        touchLastY = e.touches[0].clientY;
+        const xRange = xScale.max - xScale.min;
+        const yRange = yScale.max - yScale.min;
+        const xDelta = (dx / rect.width)  * xRange;
+        const yDelta = (dy / rect.height) * yRange;
+        xScale.options.min -= xDelta;
+        xScale.options.max -= xDelta;
+        yScale.options.min += yDelta;
+        yScale.options.max += yDelta;
+        chart.update("none");
+        e.preventDefault();
+    }
+    function onTouchEnd(){
+        touchActive = false;
+    }
+    canvas.addEventListener("mousedown", onMouseDown);
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("mouseleave", onMouseLeave);
+    canvas.addEventListener("touchstart", onTouchStart, {passive:true});
+    canvas.addEventListener("touchmove", onTouchMove, {passive:false});
+    canvas.addEventListener("touchend", onTouchEnd);
+    canvas._panAttached = true;
+}
+
+const chkMap = {
+    chkMorningLine: "morningLine",
+    chkSmoothLine: "smoothLine",
+    chkMorningDot: "morningDot",
+    chkEveningDot: "eveningDot",
+    chkHerbDot: "herbDot",
+    chkPeriodBox: "periodBox",
+    chkShotLabel: "shotLabel"
+};
+function initSeriesCheckboxes(){
+    Object.entries(chkMap).forEach(([chkId, key])=>{
+        const el = document.getElementById(chkId);
+        el.checked = !!seriesVisible[key];
+        el.addEventListener("change", ()=>{
+            seriesVisible[key] = el.checked;
+            saveSeriesVisible(seriesVisible);
+            renderChart();
+        });
+    });
+}
+
+// ========== 页面按钮事件，全部改为调用云端接口 =========
+document.getElementById("btnResetZoom").onclick = function(){
+    if(!chart) return;
+    if(typeof chart.resetZoom === "function"){
+        try { chart.resetZoom(); } catch(e){ console.warn(e); }
+    }
+    ["x", "y"].forEach(axisId => {
+        const scale = chart.scales[axisId];
+        if(!scale) return;
+        delete scale.min;
+        delete scale.max;
+        if(scale.options){
+            delete scale.options.min;
+            delete scale.options.max;
+        }
+    });
+    chart.update("none");
+};
+
+document.getElementById("btnClearForm").onclick = function(){
+    document.getElementById("recDateText").value = "";
+    document.getElementById("recDateNative").value = "";
+    document.getElementById("recMorning").value = "";
+    document.getElementById("recEvening").value = "";
+    document.getElementById("recHerb").checked = false;
+    document.getElementById("recSema").checked = false;
+    document.getElementById("recDose").value = "";
+    document.getElementById("periodStartText").value = "";
+    document.getElementById("periodStartNative").value = "";
+    document.getElementById("periodEndText").value = "";
+    document.getElementById("periodEndNative").value = "";
+};
+
+document.getElementById("btnAddRecord").onclick = async function(){
+    const dateInput = document.getElementById("recDateText").value.trim();
+    if(!dateInput){ alert("请填写日期"); return; }
+    if(!isValidDateString(dateInput)){
+        alert("日期格式错误！请填写 yyyy/mm/dd，例如 2026/10/16，或点击输入框唤起日历选择");
+        return;
+    }
+    const date = normalizeDateStr(dateInput);
+    const morning = document.getElementById("recMorning").value;
+    const evening = document.getElementById("recEvening").value;
+    const herb = document.getElementById("recHerb").checked;
+    const sema = document.getElementById("recSema").checked;
+    const dose = document.getElementById("recDose").value;
+    const newRow = {
+        date:date,
+        morning_weight: morning==="" ? null : Number(morning),
+        evening_weight: evening==="" ? null : Number(evening),
+        herb: herb,
+        semaglutide: sema,
+        dose: dose==="" ? null : Number(dose)
+    };
+    await upsertRecordCloud(newRow);
+    document.getElementById("btnClearForm").click();
+};
+
+document.getElementById("btnAddPeriod").onclick = async function(){
+    const sInput = document.getElementById("periodStartText").value.trim();
+    const eInput = document.getElementById("periodEndText").value.trim();
+    if(!sInput || !eInput){ alert("请填写经期起止时间"); return; }
+    if(!isValidDateString(sInput) || !isValidDateString(eInput)){
+        alert("经期日期格式错误！使用 yyyy/mm/dd，或点击输入框唤起日历选择");
+        return;
+    }
+    const s = normalizeDateStr(sInput);
+    const e = normalizeDateStr(eInput);
+    await insertPeriodCloud(s,e);
+    document.getElementById("btnClearForm").click();
+};
+
+document.getElementById("btnClearAllRecords").onclick = async function(){
+    if(confirm("确定要清空全部体重记录吗？该操作不可恢复，建议先导出CSV备份！")){
+        await clearAllMyRecordsCloud();
+    }
+};
+
+document.getElementById("btnExportCsv").onclick = function(){
+    const text = getFullExportText(records, periods);
+    downloadFile(text, "weight_full_export.csv");
+};
+
+document.getElementById("btnImportCsv").onclick = function(){
+    document.getElementById("fileInput").click();
+};
+
+document.getElementById("fileInput").onchange = async function(e){
+    const f = e.target.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = async function(ev){
+        const text = ev.target.result;
+        const parsed = parseFullCsv(text);
+        //批量导入云端
+        for(const r of parsed.records){
+            await upsertRecordCloud(r);
+        }
+        for(const p of parsed.periods){
+            //去重
+            const exist = periods.some(op=> op[0]===p[0] && op[1]===p[1]);
+            if(!exist) await insertPeriodCloud(p[0],p[1]);
+        }
+        alert(`导入完成：体重${parsed.records.length}条，经期${parsed.periods.length}条`);
+    };
+    reader.readAsText(f);
+    e.target.value = "";
+};
+
+document.getElementById("btnSaveImage").onclick = function(){
+    if (typeof Chart === "undefined" || !chart) {
+        alert("图表尚未加载，无法保存图片。");
+        return;
+    }
+    const link = document.createElement("a");
+    link.download = "weight_chart";
+    link.href = document.getElementById("chartCanvas").toDataURL("image/jpeg",0.92);
+    link.click();
+};
+
+//侧边栏折叠
+function toggleAccordion(id){
+    document.getElementById(id).classList.toggle("open");
+}
+
+const STORAGE_SIDEBAR = "weight_sidebar_collapsed";
+function applySidebarState(collapsed){
+    const container = document.getElementById("mainContainer");
+    if(collapsed) container.classList.add("collapsed");
+    else container.classList.remove("collapsed");
+}
+document.getElementById("sidebarHandle").onclick = function(){
+    const container = document.getElementById("mainContainer");
+    const collapsed = !container.classList.contains("collapsed");
+    apply
